@@ -13,11 +13,17 @@ public class PED {
         PEDModel model = new PEDModel();
 
         model.addModelListener(ui);
-        BufferedImage loadedImage = model.loadImage("test.png");
-        //ui.setImage(loadedImage);
+        BufferedImage loadedImage = model.loadImage("mePic.jpg");
+//        model.writeImage(loadedImage, "encrypt.jpg");
+//        model.pngrLoadImage("Jeremy16.png");
+        ui.setImage(loadedImage);
         BufferedImage newImage = model.encrypt(loadedImage);
-        ui.setImage(newImage);
-        model.writeImage(newImage,"encrypt.png");
+//        ui.setImage(newImage);
+        model.writeImage(newImage,"encrypt.jpg");
+//
+        BufferedImage decrypt = model.encrypt(newImage);
+        ui.setImage(decrypt);
+        model.writeImage(decrypt, "decrypt.jpg");
 
     }
 

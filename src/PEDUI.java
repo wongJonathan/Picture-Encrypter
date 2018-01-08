@@ -30,7 +30,6 @@ public class PEDUI implements ModelListener{
 
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout (panel, BoxLayout.Y_AXIS));
-        panel.setBorder(BorderFactory.createEmptyBorder (10, 10, 10, 10));
         frame.add(panel);
 
         imageDisplayer = new ImageDisplayer();
@@ -46,6 +45,7 @@ public class PEDUI implements ModelListener{
      */
     public void setImage(BufferedImage image){
         imageDisplayer.updateImage(image);
+        imageDisplayer.repaint();
     }
     /**
      * For testing the ui

@@ -1,3 +1,10 @@
+import ar.com.hjg.pngj.ImageLineHelper;
+import ar.com.hjg.pngj.ImageLineInt;
+import ar.com.hjg.pngj.PngReaderInt;
+import ar.com.hjg.pngj.PngWriter;
+import ar.com.hjg.pngj.chunks.ChunkCopyBehaviour;
+import ar.com.hjg.pngj.chunks.PngChunkTextVar;
+
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -9,7 +16,7 @@ public class PEDModel {
     private ModelListener listener;
 
     private byte[] key = {(byte)0xac, (byte)0x09, (byte)0xa3, (byte)0x03, (byte)0xbd, (byte)0x4d, (byte)0x7b, (byte)0x18, (byte)0x85, (byte)0xb0, (byte)0x29, (byte)0xdb, (byte)0x8e, (byte)0x17, (byte)0xe7, (byte)0xd9 };
-    private byte[] key4 = {(byte)0xac, (byte)0x09, (byte)0xa3, (byte)0x03};
+    private byte[] key4 = {(byte)0x8e, (byte)0xd9, (byte)0x09, (byte)0xbd};
 
     public PEDModel(){
     }
@@ -27,11 +34,37 @@ public class PEDModel {
         BufferedImage img = null;
         try{
             img = ImageIO.read(new File("pictures/"+imageName));
+
+
         } catch(IOException ex){
             System.err.println("Error loading image: "+imageName);
         }
-        System.out.println(img);
+        System.out.println(img.getPropertyNames());
         return img;
+    }
+
+    public void pngrLoadImage(String imageName){
+        PngReaderInt pngr = new PngReaderInt(new File("pictures/" + imageName));
+        int channels = pngr.imgInfo.channels;
+
+        PngWriter pngw = new PngWriter(new File("pictures/encrypted-" + imageName), pngr.imgInfo, true);
+// instruct the writer to grab all ancillary chunks from the original
+        pngw.copyChunksFrom(pngr.getChunksList(), ChunkCopyBehaviour.COPY_ALL_SAFE);
+        // add a textual chunk to writer
+        pngw.getMetadata().setText(PngChunkTextVar.KEY_Description, "Decreased red and increased green");
+        // also: while(pngr.hasMoreRows())
+        for (int row = 0; row < pngr.imgInfo.rows; row++) {
+            ImageLineInt l1 = pngr.readRowInt(); // each element is a sample
+//            int[] scanline = l1.getScanline(); // to save typing
+//            for (int j = 0; j < pngr.imgInfo.cols; j++) {
+//                scanline[j * channels] /= 2;
+//                scanline[j * channels + 1] = ImageLineHelper.clampTo_0_255(scanline[j * channels + 1] + 20);
+//            }
+            pngw.writeRow(l1);
+        }
+        pngr.end(); // it's recommended to end the reader first, in case there are trailing chunks to read
+        pngw.end();
+        System.out.println("Done writing ");
     }
 
     /**
@@ -41,12 +74,15 @@ public class PEDModel {
      */
     public void writeImage(BufferedImage image, String imageName){
         try{
+            System.out.println("Image type: "+image.getType());
+
             String[] imageNameSplit = imageName.split("\\.");
             String fileType = imageNameSplit[imageNameSplit.length - 1];
             ImageIO.write(image, fileType, new File("pictures/"+imageName));
         } catch(IOException ex){
             System.err.println("Error writing image: "+imageName);
         }
+        System.out.println("Done writing");
     }
 
     public BufferedImage encrypt(BufferedImage image){
@@ -71,24 +107,27 @@ public class PEDModel {
                 result[1] = (byte) (color >> 16);
                 result[2] = (byte) (color >> 8);
                 result[3] = (byte) (color /*>> 0*/);
-                System.out.println("Bytes: ( "+ (result[1]& 0xff) +", "+ (result[2] & 0xff) + ", " + (result[3] & 0xff)+ ")\t");
+//                System.out.println("Bytes: ( "+ (result[1]& 0xff) +", "+ (result[2] & 0xff) + ", " + (result[3] & 0xff)+ ", " + (result[0] & 0xff) + ")\t");
                 // Where encryption occurs
                 // @todo might want to do a block cipher to swap values of pixels
-                for(int i = 0 ; i < 4; i++){
+                // Ignores the first byte which is the alpha value
+                for(int i = 1 ; i < 4; i++){
                     result[i] = (byte)(result[i] ^ key4[i]);
                 }
-                System.out.println("Bytes: ( "+ (result[1]& 0xff) +", "+ (result[2] & 0xff) + ", " + (result[3] & 0xff)+ ")\t");
+//                System.out.println("Bytes: ( "+ (result[1]& 0xff) +", "+ (result[2] & 0xff) + ", " + (result[3] & 0xff)+ ", " + (result[0] & 0xff) + ")\t");
 
 
-                Color newColor = new Color((result[1]& 0xff), (result[2] & 0xff), (result[3] & 0xff), 1);
+                Color newColor = new Color((result[1]& 0xff), (result[2] & 0xff), (result[3] & 0xff), (result[0] & 0xff));
 
                 newImage.setRGB(x,y,newColor.getRGB());
             }
             //System.out.println();
         }
 
-
+        System.out.println("Done");
         // Idea: after arranging the colors, then swap positions of the pixels
         return newImage;
     }
+
+
 }
