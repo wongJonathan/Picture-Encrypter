@@ -8,6 +8,9 @@ public class PEDModel {
 
     private ModelListener listener;
 
+    private byte[] key = {(byte)0xac, (byte)0x09, (byte)0xa3, (byte)0x03, (byte)0xbd, (byte)0x4d, (byte)0x7b, (byte)0x18, (byte)0x85, (byte)0xb0, (byte)0x29, (byte)0xdb, (byte)0x8e, (byte)0x17, (byte)0xe7, (byte)0xd9 };
+    private byte[] key4 = {(byte)0xac, (byte)0x09, (byte)0xa3, (byte)0x03};
+
     public PEDModel(){
     }
 
@@ -38,7 +41,7 @@ public class PEDModel {
      */
     public void writeImage(BufferedImage image, String imageName){
         try{
-            String[] imageNameSplit = imageName.split(".");
+            String[] imageNameSplit = imageName.split("\\.");
             String fileType = imageNameSplit[imageNameSplit.length - 1];
             ImageIO.write(image, fileType, new File("pictures/"+imageName));
         } catch(IOException ex){
@@ -55,14 +58,37 @@ public class PEDModel {
                 int color = newImage.getRGB(x,y);
 
                 // Gets the values of each color and alpha
-                int red = (color & 0xFF0000) >> 16;
-                int green = (color & 0xFF00) >> 8;
-                int blue = (color & 0xFF);
-                int alpha = (color & 0xff000000) >>> 24;
-                System.out.print("( "+ red +", "+ green + ", " + blue + ")\t");
+//                int alpha = (color & 0xff000000) >>> 24;
+//                int red = (color & 0xFF0000) >> 16;
+//                int green = (color & 0xFF00) >> 8;
+//                int blue = (color & 0xFF);
+//                System.out.println("INTS: ( "+ red +", "+ green + ", " + blue + ")\t");
+
+                // Creates the byte array
+                byte[] result = new byte[4];
+
+                result[0] = (byte) (color >> 24);
+                result[1] = (byte) (color >> 16);
+                result[2] = (byte) (color >> 8);
+                result[3] = (byte) (color /*>> 0*/);
+                System.out.println("Bytes: ( "+ (result[1]& 0xff) +", "+ (result[2] & 0xff) + ", " + (result[3] & 0xff)+ ")\t");
+                // Where encryption occurs
+                // @todo might want to do a block cipher to swap values of pixels
+                for(int i = 0 ; i < 4; i++){
+                    result[i] = (byte)(result[i] ^ key4[i]);
+                }
+                System.out.println("Bytes: ( "+ (result[1]& 0xff) +", "+ (result[2] & 0xff) + ", " + (result[3] & 0xff)+ ")\t");
+
+
+                Color newColor = new Color((result[1]& 0xff), (result[2] & 0xff), (result[3] & 0xff), 1);
+
+                newImage.setRGB(x,y,newColor.getRGB());
             }
-            System.out.println();
+            //System.out.println();
         }
+
+
+        // Idea: after arranging the colors, then swap positions of the pixels
         return newImage;
     }
 }
