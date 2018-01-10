@@ -43,8 +43,14 @@ public class PEDModel {
         return img;
     }
 
-    public void pngrLoadImage(String imageName){
+    /**
+     * Loads a png image using pngj library
+     * @param imageName     The name of the image
+     */
+    public void pngjLoadImage(String imageName){
         PngReaderInt pngr = new PngReaderInt(new File("pictures/" + imageName));
+
+        // 3 for RGB, 4 for RGBA
         int channels = pngr.imgInfo.channels;
 
         PngWriter pngw = new PngWriter(new File("pictures/encrypted-" + imageName), pngr.imgInfo, true);
@@ -55,11 +61,22 @@ public class PEDModel {
         // also: while(pngr.hasMoreRows())
         for (int row = 0; row < pngr.imgInfo.rows; row++) {
             ImageLineInt l1 = pngr.readRowInt(); // each element is a sample
-//            int[] scanline = l1.getScanline(); // to save typing
-//            for (int j = 0; j < pngr.imgInfo.cols; j++) {
-//                scanline[j * channels] /= 2;
-//                scanline[j * channels + 1] = ImageLineHelper.clampTo_0_255(scanline[j * channels + 1] + 20);
-//            }
+
+            // scanline's lenght = cols * channels, for png it's R, G, B, or A for each pixel in the row
+            int[] scanline = l1.getScanline(); // to save typing
+            System.out.println("Scanline: "+scanline.length + " cols: "+pngr.imgInfo.cols);
+            for (int j = 0; j < pngr.imgInfo.cols; j++) {
+
+                byte[] pixel = new byte[channels];
+                for(int i = 0 ; i < channels; i++) {
+                    pixel[i] = (byte)scanline[j * channels + i];
+                }
+                pixel = encryptPixel(pixel);
+                for(int i = 0 ; i < channels; i++) {
+                    scanline[j * channels + i] = (int)pixel[i];
+                }
+
+            }
             pngw.writeRow(l1);
         }
         pngr.end(); // it's recommended to end the reader first, in case there are trailing chunks to read
@@ -85,7 +102,13 @@ public class PEDModel {
         System.out.println("Done writing");
     }
 
-    public BufferedImage encrypt(BufferedImage image){
+
+    /**
+     * Encrypts jpg iamges
+     * @param image
+     * @return
+     */
+    public BufferedImage encryptJPG(BufferedImage image){
         BufferedImage newImage = image;
 
 
@@ -111,9 +134,7 @@ public class PEDModel {
                 // Where encryption occurs
                 // @todo might want to do a block cipher to swap values of pixels
                 // Ignores the first byte which is the alpha value
-                for(int i = 1 ; i < 4; i++){
-                    result[i] = (byte)(result[i] ^ key4[i]);
-                }
+                result = encryptPixel(result);
 //                System.out.println("Bytes: ( "+ (result[1]& 0xff) +", "+ (result[2] & 0xff) + ", " + (result[3] & 0xff)+ ", " + (result[0] & 0xff) + ")\t");
 
 
@@ -130,4 +151,19 @@ public class PEDModel {
     }
 
 
+    /**
+     * Encrypts the pixel using a stream cipher
+     * @param pixelData     The RGB(A) values of a pixel
+     * @return              The cipher version of the pixel
+     */
+    private byte[] encryptPixel(byte[] pixelData){
+        byte[] newPixel = new byte[pixelData.length];
+        for(int i = 0 ; i < pixelData.length; i++){
+            int keyIndex = i % key4.length;
+
+            newPixel[i] = (byte)(pixelData[i] ^ key4[keyIndex]);
+        }
+
+        return newPixel;
+    }
 }
