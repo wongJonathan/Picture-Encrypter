@@ -5,18 +5,37 @@ import ar.com.hjg.pngj.PngWriter;
 import ar.com.hjg.pngj.chunks.ChunkCopyBehaviour;
 import ar.com.hjg.pngj.chunks.PngChunkTextVar;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.Key;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 
 public class PEDModel {
 
+    private final String algo = "AES/CBC/PKCS5Padding";
+
     private ModelListener listener;
 
-    private byte[] key = {(byte)0xac, (byte)0x09, (byte)0xa3, (byte)0x03, (byte)0xbd, (byte)0x4d, (byte)0x7b, (byte)0x18, (byte)0x85, (byte)0xb0, (byte)0x29, (byte)0xdb, (byte)0x8e, (byte)0x17, (byte)0xe7, (byte)0xd9 };
-    private byte[] key4 = {(byte)0x8e, (byte)0xd9, (byte)0x09, (byte)0xbd};
+    private byte[] key16 = {(byte)0xac, (byte)0x09, (byte)0xa3, (byte)0x03, (byte)0xbd, (byte)0x4d, (byte)0x7b, (byte)0x18, (byte)0x85, (byte)0xb0, (byte)0x29, (byte)0xdb, (byte)0x8e, (byte)0x17, (byte)0xe7, (byte)0xd9 };
+    private byte[] key4 = new byte[]{'t','e','s','t'};
 
     public PEDModel(){
     }
@@ -104,50 +123,90 @@ public class PEDModel {
 
 
     /**
+     * Writes the encrypted file
+     * @param encryptedBytes
+     * @param filename
+     */
+    public void writeFile(byte[] encryptedBytes, String filename ){
+        try {
+            FileOutputStream fos = new FileOutputStream("pictures/encrypted.txt");
+            fos.write(encryptedBytes);
+            fos.close();
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+    }
+
+    public byte[] readFile(String fileName) {
+        try {
+            Path file = Paths.get("pictures/" + fileName);
+            return Files.readAllBytes(file);
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
      * Encrypts jpg iamges
      * @param image
      * @return
      */
-    public BufferedImage encryptJPG(BufferedImage image){
+    public byte[] encryptJPG(BufferedImage image){
         BufferedImage newImage = image;
 
 
+        int keyIndex = 1;
+
+        int[] colors = new int[image.getWidth() * image.getHeight()];
+
+        //@todo try getting all of the image into one byte array
         for (int y = 0; y < image.getHeight(); y++) {
             for (int x = 0; x < image.getWidth(); x++) {
-                int color = newImage.getRGB(x,y);
-
-                // Gets the values of each color and alpha
-//                int alpha = (color & 0xff000000) >>> 24;
-//                int red = (color & 0xFF0000) >> 16;
-//                int green = (color & 0xFF00) >> 8;
-//                int blue = (color & 0xFF);
-//                System.out.println("INTS: ( "+ red +", "+ green + ", " + blue + ")\t");
-
-                // Creates the byte array
-                byte[] result = new byte[4];
-
-                result[0] = (byte) (color >> 24);
-                result[1] = (byte) (color >> 16);
-                result[2] = (byte) (color >> 8);
-                result[3] = (byte) (color /*>> 0*/);
-//                System.out.println("Bytes: ( "+ (result[1]& 0xff) +", "+ (result[2] & 0xff) + ", " + (result[3] & 0xff)+ ", " + (result[0] & 0xff) + ")\t");
-                // Where encryption occurs
-                // @todo might want to do a block cipher to swap values of pixels
-                // Ignores the first byte which is the alpha value
-                result = encryptPixel(result);
-//                System.out.println("Bytes: ( "+ (result[1]& 0xff) +", "+ (result[2] & 0xff) + ", " + (result[3] & 0xff)+ ", " + (result[0] & 0xff) + ")\t");
-
-
-                Color newColor = new Color((result[1]& 0xff), (result[2] & 0xff), (result[3] & 0xff), (result[0] & 0xff));
-
-                newImage.setRGB(x,y,newColor.getRGB());
+                int color = image.getRGB(x,y);
+                colors[x] = color;
             }
-            //System.out.println();
         }
 
-        System.out.println("Done");
         // Idea: after arranging the colors, then swap positions of the pixels
-        return newImage;
+        return testEncrypt(colors);
+    }
+
+    /**
+     * Decrypts jpg iamges
+     * @param
+     * @return
+     */
+    public BufferedImage decryptJPG(byte[] imageFile){
+
+        BufferedImage decryptedImage = new BufferedImage(401, 471, BufferedImage.TYPE_INT_ARGB);
+
+        byte[] decryptedByte = testDecrypt(imageFile);
+//        for(int i = 0; i < decryptedByte.length; i++) {
+//            System.out.println("byte: "+decryptedByte[i]);
+//
+//        }
+        int byteIndex = 0;
+        System.out.println("Decrypting");
+
+//        for (int y = image.getHeight() - 1; y >= 0 ; y--) {
+//            for (int x = image.getWidth() - 1; x >= 0 ; x--) {
+        for (int y = 0; y < decryptedImage.getHeight(); y++) {
+
+            for (int x = 0; x < decryptedImage.getWidth(); x++) {
+
+                int alpha = decryptedByte[byteIndex++] & 0xff;
+                int red = decryptedByte[byteIndex++] & 0xff;
+                int green = decryptedByte[byteIndex++] & 0xff;
+                int blue = decryptedByte[byteIndex++] & 0xff;
+                Color newColor = new Color(red, green, blue, alpha);
+                decryptedImage.setRGB(x,y, newColor.getRGB());
+            }
+        }
+
+        System.out.println("Done Decrypting");
+        // Idea: after arranging the colors, then swap positions of the pixels
+        return decryptedImage;
     }
 
 
@@ -165,5 +224,94 @@ public class PEDModel {
         }
 
         return newPixel;
+    }
+
+
+
+
+
+    /**
+     * Creates the byte array
+     * @param color     The color to be converted
+     * @return  the byte array
+     */
+    private byte[] colorToBytes(int color) {
+        byte[] result = new byte[4];
+        result[0] = (byte) (color >> 24);
+        result[1] = (byte) (color >> 16);
+        result[2] = (byte) (color >> 8);
+        result[3] = (byte) (color /*>> 0*/);
+        return result;
+    }
+
+    /**
+     * Testing java's encryptions by encrypting each row of pictures
+     * @param imageFile
+     * @return
+     */
+    private byte[] testEncrypt(int[] imageFile){
+        // Converts the colors to a row of byte arrays
+        ByteBuffer byteBuffer = ByteBuffer.allocate(imageFile.length * 4);
+        IntBuffer intBuffer = byteBuffer.asIntBuffer();
+        intBuffer.put(imageFile);
+
+        byte[] array = byteBuffer.array();
+
+        try {
+
+            Key key = new SecretKeySpec(key16, "AES");
+            Cipher c = Cipher.getInstance(algo);
+            c.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(new byte[16]));
+
+
+            // need to see if splitting int is okay
+            byte[] encryptedBytes = c.doFinal(array);
+            System.out.println("encryptedBytes length: "+encryptedBytes.length);
+
+            return encryptedBytes;
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (InvalidAlgorithmParameterException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private byte[] testDecrypt(byte[] imageFile) {
+
+        try {
+            Key key = new SecretKeySpec(key16, "AES");
+            Cipher c = Cipher.getInstance(algo);
+// decryption replaces with 0s
+            c.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(new byte[16]));
+
+            // need to see if splitting int is okay
+            byte[] encryptedBytes = c.doFinal(imageFile);
+            System.out.println("encryptedBytes length: "+encryptedBytes.length);
+
+            return encryptedBytes;
+
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (InvalidAlgorithmParameterException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 }

@@ -51,11 +51,12 @@ public class PED {
         //        model.writeImage(loadedImage, "encrypt.jpg");
 
                 ui.setImage(loadedImage);
-                BufferedImage newImage = model.encryptJPG(loadedImage);
-                ui.setImage(newImage);
-                model.writeImage(newImage,"encrypt.jpg");
+                byte[] encryptedBytes = model.encryptJPG(loadedImage);
+                model.writeFile(encryptedBytes, "encrypted.txt");
 
-                BufferedImage decrypt = model.encryptJPG(newImage);
+
+//                encryptedBytes = model.readFile("encrypted.txt");
+                BufferedImage decrypt = model.decryptJPG(encryptedBytes);
                 ui.setImage(decrypt);
                 model.writeImage(decrypt, "decrypt.jpg");
             }

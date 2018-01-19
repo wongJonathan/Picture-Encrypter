@@ -14,7 +14,7 @@ public class ImageDisplayer extends Component {
 
     public Dimension getPreferredSize() {
         if (image == null) {
-            return new Dimension(100,100);
+            return new Dimension(400,400);
         } else {
             return new Dimension(image.getWidth(null), image.getHeight(null));
         }
