@@ -11,70 +11,107 @@ public class PED {
 
     public static void main(String args[]) {
 
-        if (args.length != 2) {
+        if (args.length != 3) {
             printError("Not enough arguments");
         }
 
-        String command = args[0];
-        String[] imageFile = new String[1];
-        imageFile[0] = args[1];
+        String key = args[0];
+        String command = args[1];
+        String imagePath = args[2];     // for the initial path
+        String[] imageFiles = {imagePath};            // for multiple files
 
-        PEDUI ui = new PEDUI();
+        boolean encrypt = false;
+
         PEDModel model = new PEDModel();
+        Encryptor encryptor = new Encryptor(key);
 
-        int numberOfFiles = 1;
+        if (command.contains("encrypt")) {
+            encrypt = true;
+        } else if (!command.contains("decrypt")) {
+            printError("Must select encrypt or decrypt for command option.");
+        }
 
         // Checks to see if a folder was given
-        if (imageFile[0].substring(imageFile[0].length() - 1).equals("/")) {
+        if (imagePath.substring(imagePath.length() - 1).equals("/")) {
             // Folder is called
             // Change the number of files to the number of files
             // Probably need an array of file names for the for loop
 
-            File[] fileArray=new File(imageFile[0]).listFiles();
-            imageFile = new String[fileArray.length];
+            File[] fileArray = new File(imagePath).listFiles();
+            imageFiles = new String[fileArray.length];
 
+            int imageFilesIndex = 0;
             // Gets all the files in the folder storing it in an array
             for (int i = 0; i < fileArray.length; i++) {
-                imageFile[i] = fileArray[i].getName();
+                if (!encrypt) {
+                    if (fileArray[i].getName().contains("-encrypted")) {
+                        imageFiles[imageFilesIndex++] = imagePath + fileArray[i].getName();
+                    }
+                } else {
+                    if (!fileArray[i].getName().contains("-encrypted")) {
+                        imageFiles[imageFilesIndex++] = imagePath + fileArray[i].getName();
+                    }
+                }
             }
         }
 
-        for (int i = 0 ; i < numberOfFiles; i++) {
-            model.addModelListener(ui);
+        for (int i = 0; i < imageFiles.length; i++) {
+            System.out.println(imageFiles[i]);
+            if (imageFiles[i] != null) {
+                String imageName = getFileName(imageFiles[i], encrypt);
+                if (imageFiles[i].contains(".png") || imageFiles[i].contains(".PNG")) {
 
-            if(imageFile[i].contains(".png") || imageFile[i].contains(".PNG")){
-                // use png version
-                model.pngjLoadImage(imageFile[i]);
+                    // use png version
+                    model.pngjLoadImage(imageFiles[i], imageName);
+                    encryptor.encryptPng(model.getPngw(), model.getPngr());
+                    model.closePng();
+
+                } else {
+                    BufferedImage loadedImage = model.loadImage(imageFiles[i]);
+
+                    BufferedImage newImage = encryptor.encryptJPG(loadedImage);
+
+                    model.writeImage(newImage, imageName);
+
+                }
+                System.out.println("Done writing ");
 
             } else {
-                BufferedImage loadedImage = model.loadImage(imageFile[i]);
-        //        model.writeImage(loadedImage, "encrypt.jpg");
-
-                ui.setImage(loadedImage);
-                BufferedImage newImage = model.encryptJPG(loadedImage);
-                ui.setImage(newImage);
-                model.writeImage(newImage,"encrypt.jpg");
-
-                BufferedImage decrypt = model.encryptJPG(newImage);
-                ui.setImage(decrypt);
-                model.writeImage(decrypt, "decrypt.jpg");
+                break;
             }
-
-
-
-
         }
     }
 
     /**
-     * Prints the usage error message
-     * @param errorMessage  The error message
+     * Gets the name based on the file path
+     *
+     * @param imagePath
+     * @return
      */
-    private static void printError(String errorMessage){
+    private static String getFileName(String imagePath, boolean encrypt) {
+        String[] imageNameSplit = imagePath.split("\\.");
+        String fileType = imageNameSplit[imageNameSplit.length - 1];
+
+        String postFix = "-encrypted";
+
+        if (!encrypt) {
+            postFix = "-decrypted";
+        }
+
+        return imageNameSplit[0] + postFix + "." + fileType;
+    }
+
+    /**
+     * Prints the usage error message
+     *
+     * @param errorMessage The error message
+     */
+    private static void printError(String errorMessage) {
         System.out.println(errorMessage);
-        String usageMessage = "Usage: java PED <command> <image file>\n"+
+        String usageMessage = "Usage: java PED <key> <command> <image file>\n" +
+                "<key> is the key to encrypt and decrypt with\n" +
                 "<command> is either encrypt or decrypt\n" +
-                "<image file> is the image to either encrypt or decrypt, for folder <folder name>/";
+                "<image path> is the image to either encrypt or decrypt, for folder <folder name>/";
         System.out.println(usageMessage);
         System.exit(0);
     }
