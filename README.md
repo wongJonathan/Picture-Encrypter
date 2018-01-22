@@ -18,7 +18,7 @@ A command line tool that makes encrypting and decrypting pictures easy.
 * jpg, jpeg
 
 ## Libraries Used:
-* pngj
+* [pngj](https://github.com/leonbloy/pngj)
 
 Known issues:
 * Compression for JPEG files are more noticeable 
